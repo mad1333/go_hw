@@ -1,0 +1,102 @@
+name: Course acceptance tests
+on:
+  workflow_dispatch:
+    inputs:
+      student-repository:
+        description: 'Student repository: owner/repository (public)'
+        required: true
+        type: string
+      student-ref:
+        description: 'Branch, SHA or PR ref, for example refs/pull/2/head'
+        default: main
+        required: true
+        type: string
+      task:
+        description: Homework number
+        required: true
+        type: choice
+        options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+      solution-dir:
+        description: Directory containing the student go.mod
+        default: auto
+        type: string
+      package-dir:
+        description: Main package directory relative to solution-dir
+        default: auto
+        type: string
+      tests-ref:
+        description: Tests version (use the same ref selected in the Run workflow menu)
+        default: main
+        type: string
+  workflow_call:
+    inputs:
+      student-repository:
+        default: ''
+        type: string
+      student-ref:
+        default: ''
+        type: string
+      task:
+        default: auto
+        type: string
+      solution-dir:
+        default: auto
+        type: string
+      package-dir:
+        default: auto
+        type: string
+      tests-ref:
+        description: Use the same tag or SHA as the reusable workflow reference
+        default: main
+        type: string
+permissions:
+  contents: read
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout student PR head
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.student-repository || github.repository }}
+          ref: ${{ inputs.student-ref || github.event.pull_request.head.sha || github.sha }}
+          path: submission
+          persist-credentials: false
+      - name: Checkout trusted tests
+        uses: actions/checkout@v7
+        with:
+          repository: vacmannnn/go-courses
+          ref: ${{ inputs.tests-ref }}
+          path: course-tests
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.4'
+          cache: false
+      - name: Install grader dependencies
+        run: python3 -m pip install -r course-tests/autotests/requirements.txt
+      - name: Grade
+        env:
+          COURSE_TASK: ${{ inputs.task }}
+          COURSE_MODULE: ${{ inputs.solution-dir }}
+          COURSE_PACKAGE: ${{ inputs.package-dir }}
+          COURSE_PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python3 course-tests/autotests/scripts/ci.py \
+            --repo "$GITHUB_WORKSPACE/submission" \
+            --pr-title "$COURSE_PR_TITLE" \
+            --task "$COURSE_TASK" \
+            --module "$COURSE_MODULE" \
+            --package "$COURSE_PACKAGE" \
+            --report "$RUNNER_TEMP/course-report.json"
+      - name: Add JSON report to summary
+        if: always()
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          report = Path(os.environ['RUNNER_TEMP']) / 'course-report.json'
+          if report.exists():
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                  summary.write('### Course test report\n\n```json\n' + report.read_text() + '\n```\n')

@@ -1,0 +1,15 @@
+name: HW 3 tests
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  grade:
+    if: github.head_ref == 'HW-3'
+    uses: ./.github/workflows/grade.yml
+    with:
+      task: '3'
+      solution-dir: '.'
+      package-dir: './cmd/movie-service'
+      tests-ref: main
