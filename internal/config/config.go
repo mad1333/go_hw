@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-type Config struct{ BaseURL, HTTPAddr, GRPCAddr string }
+type Config struct{ BaseURL, HTTPAddr, GRPCAddr, DatabaseURL string }
 
 func Load() (Config, error) {
-	c := Config{value("MOVIE_BASE_URL", "https://homeworksite.site"), value("HTTP_ADDR", ":8080"), value("GRPC_ADDR", ":9090")}
+	c := Config{value("MOVIE_BASE_URL", "https://homeworksite.site"), value("HTTP_ADDR", ":8080"), value("GRPC_ADDR", ":9090"), value("DATABASE_URL", "")}
 	u, err := url.Parse(c.BaseURL)
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.RawQuery != "" || u.Fragment != "" {
 		return c, fmt.Errorf("invalid MOVIE_BASE_URL")
