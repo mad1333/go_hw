@@ -6,6 +6,7 @@ import (
 	"fmt"
 	pb "go_hw/api/movies/v1"
 	"go_hw/internal/adapter/moviehttp"
+	"go_hw/internal/adapter/postgres"
 	"go_hw/internal/config"
 	"go_hw/internal/handler/grpcapi"
 	"go_hw/internal/handler/httpapi"
@@ -26,6 +27,27 @@ func serve(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if c.DatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL must not be empty")
+	}
+	startup, cancelStartup := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancelStartup()
+	repository, err := postgres.New(startup, c.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer repository.Close()
+	if err = repository.Migrate(startup); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+	provider := moviehttp.New(c.BaseURL, client, 5*time.Second)
+	if err = usecase.NewSynchronizer(provider, repository).Sync(startup); err != nil {
+		return fmt.Errorf("synchronize movies: %w", err)
+	}
+	cancelStartup()
+	service := usecase.NewStored(repository)
 	httpListener, err := net.Listen("tcp", c.HTTPAddr)
 	if err != nil {
 		return fmt.Errorf("HTTP listen: %w", err)
@@ -36,9 +58,7 @@ func serve(ctx context.Context) error {
 		return fmt.Errorf("gRPC listen: %w", err)
 	}
 	defer grpcListener.Close()
-	client := &http.Client{}
-	defer client.CloseIdleConnections()
-	service := usecase.New(moviehttp.New(c.BaseURL, client, 5*time.Second))
+
 	httpServer := &http.Server{Handler: httpapi.New(service), ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	grpcServer := grpc.NewServer()
 	pb.RegisterMovieServiceServer(grpcServer, grpcapi.New(service))
