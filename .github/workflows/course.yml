@@ -1,0 +1,20 @@
+# Push go-courses with the workflows before using this example.
+# Copy to .github/workflows/course.yml in the student's repository.
+name: Homework
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Homework number
+        required: true
+        type: choice
+        options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+permissions:
+  contents: read
+jobs:
+  homework:
+    uses: vacmannnn/go-courses/.github/workflows/grade.yml@main
+    with:
+      task: ${{ inputs.task || 'auto' }}
