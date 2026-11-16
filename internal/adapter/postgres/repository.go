@@ -88,3 +88,23 @@ func (r *Repository) Save(ctx context.Context, m domain.Movie) error {
 	_, err := r.pool.Exec(ctx, "INSERT INTO movies(id,title,year,director) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING", m.ID, m.Title, m.Year, m.Director)
 	return err
 }
+
+func (r *Repository) GetMovies(ctx context.Context, from, to int) ([]domain.Movie, error) {
+	rows, err := r.pool.Query(ctx, "SELECT id,title,year,director FROM movies WHERE id BETWEEN $1 AND $2 ORDER BY id", from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	movies := []domain.Movie{}
+	for rows.Next() {
+		var m domain.Movie
+		if err := rows.Scan(&m.ID, &m.Title, &m.Year, &m.Director); err != nil {
+			return nil, err
+		}
+		movies = append(movies, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return movies, nil
+}

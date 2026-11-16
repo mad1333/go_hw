@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pb "go_hw/api/movies/v1"
@@ -85,6 +86,19 @@ func TestSyncAndStoredAPI(t *testing.T) {
 	}
 	if _, err = isolated.pool.Exec(ctx, "DELETE FROM movies WHERE id=2"); err != nil {
 		t.Fatal(err)
+	}
+	movies, loadErr := usecase.NewStored(isolated).LoadMovies(ctx, 1, 6)
+	var partial *domain.PartialError
+	if !errors.As(loadErr, &partial) || len(movies) != 4 || len(partial.Failures) != 2 || partial.Failures[0].ID != 2 || partial.Failures[1].ID != 6 {
+		t.Fatalf("movies=%+v err=%v", movies, loadErr)
+	}
+	selected, selectErr := isolated.GetMovies(ctx, 3, 4)
+	if selectErr != nil || len(selected) != 2 || selected[0].ID != 3 || selected[1].ID != 4 {
+		t.Fatalf("movies=%+v err=%v", selected, selectErr)
+	}
+	empty, emptyErr := isolated.GetMovies(ctx, 10, 11)
+	if emptyErr != nil || empty == nil || len(empty) != 0 {
+		t.Fatalf("movies=%+v err=%v", empty, emptyErr)
 	}
 	if err = syncer.Sync(ctx); err != nil {
 		t.Fatal(err)
