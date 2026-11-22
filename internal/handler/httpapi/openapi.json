@@ -163,6 +163,42 @@
           }
         }
       }
+    },
+    "/search": {
+      "get": {
+        "summary": "Search whole words in title and director (AND)",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching movies; empty array when no matches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty query"
+          },
+          "500": {
+            "description": "Search storage error"
+          }
+        }
+      }
     }
   },
   "components": {

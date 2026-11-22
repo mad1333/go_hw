@@ -18,8 +18,26 @@ var spec []byte
 
 const index = `<!doctype html><html><head><meta charset="utf-8"><title>Movies API</title><link rel="stylesheet" href="/swagger/assets/swagger-ui.css"></head><body><div id="swagger-ui"></div><script src="/swagger/assets/swagger-ui-bundle.js"></script><script>SwaggerUIBundle({url:"/swagger/openapi.json",dom_id:"#swagger-ui"});</script></body></html>`
 
-func New(s usecase.MovieUseCase) http.Handler {
+func New(s usecase.MovieUseCase, search usecase.MovieSearch) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /search", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		if search == nil {
+			write(w, 500, map[string]string{"error": "search is unavailable"})
+			return
+		}
+		movies, err := search.Search(ctx, r.URL.Query().Get("q"))
+		if err != nil {
+			if domain.Code(err) == "invalid_argument" {
+				write(w, 400, map[string]string{"error": err.Error()})
+			} else {
+				write(w, 500, map[string]string{"error": "search failed"})
+			}
+			return
+		}
+		write(w, 200, movies)
+	})
 	mux.HandleFunc("GET /load-movies", func(w http.ResponseWriter, r *http.Request) {
 		from, e1 := strconv.Atoi(r.URL.Query().Get("from"))
 		to, e2 := strconv.Atoi(r.URL.Query().Get("to"))

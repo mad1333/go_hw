@@ -24,7 +24,7 @@ func TestHTTP(t *testing.T) {
 		fmt.Fprintf(w, `{"id":%d,"title":"Film","year":2020,"director":"Director"}`, id)
 	}))
 	defer upstream.Close()
-	h := New(newService(upstream.URL, upstream.Client(), time.Second))
+	h := New(newService(upstream.URL, upstream.Client(), time.Second), nil)
 	for _, tt := range []struct {
 		url    string
 		status int
@@ -73,7 +73,7 @@ func TestHTTP(t *testing.T) {
 func TestHTTPUpstreamErrors(t *testing.T) {
 	for _, tt := range []struct{ up, want int }{{404, 404}, {429, 503}, {500, 502}} {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(tt.up) }))
-		h := New(newService(upstream.URL, upstream.Client(), time.Second))
+		h := New(newService(upstream.URL, upstream.Client(), time.Second), nil)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", "/last-movie", nil))
 		upstream.Close()

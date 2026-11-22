@@ -7,6 +7,7 @@ import (
 	pb "go_hw/api/movies/v1"
 	"go_hw/internal/adapter/moviehttp"
 	"go_hw/internal/adapter/postgres"
+	redisstore "go_hw/internal/adapter/redis"
 	"go_hw/internal/config"
 	"go_hw/internal/handler/grpcapi"
 	"go_hw/internal/handler/httpapi"
@@ -46,6 +47,15 @@ func serve(ctx context.Context) error {
 	if err = usecase.NewSynchronizer(provider, repository).Sync(startup); err != nil {
 		return fmt.Errorf("synchronize movies: %w", err)
 	}
+	store, err := redisstore.New(startup, c.RedisAddr)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	search := usecase.NewSearch(repository, store, store)
+	if err = search.BuildIndex(startup); err != nil {
+		return fmt.Errorf("build search index: %w", err)
+	}
 	cancelStartup()
 	service := usecase.NewStored(repository)
 	httpListener, err := net.Listen("tcp", c.HTTPAddr)
@@ -59,7 +69,7 @@ func serve(ctx context.Context) error {
 	}
 	defer grpcListener.Close()
 
-	httpServer := &http.Server{Handler: httpapi.New(service), ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
+	httpServer := &http.Server{Handler: httpapi.New(service, search), ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	grpcServer := grpc.NewServer()
 	pb.RegisterMovieServiceServer(grpcServer, grpcapi.New(service))
 	reflection.Register(grpcServer)

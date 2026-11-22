@@ -17,6 +17,11 @@ import (
 )
 
 func TestStartupAndRestart(t *testing.T) {
+	redisAddr := os.Getenv("TEST_REDIS_ADDR")
+	if redisAddr == "" {
+		t.Skip("TEST_REDIS_ADDR is not set")
+	}
+	t.Setenv("REDIS_ADDR", redisAddr)
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
@@ -108,6 +113,16 @@ func TestStartupAndRestart(t *testing.T) {
 					t.Fatal("startup timed out")
 				case <-time.After(20 * time.Millisecond):
 				}
+			}
+			searchResponse, err := client.Get("http://" + addr + "/search?q=Film")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var searchMovies []domain.Movie
+			err = json.NewDecoder(searchResponse.Body).Decode(&searchMovies)
+			searchResponse.Body.Close()
+			if err != nil || searchResponse.StatusCode != 200 || len(searchMovies) != int(last.Load()) {
+				t.Fatalf("search=%+v status=%d err=%v", searchMovies, searchResponse.StatusCode, err)
 			}
 			offline.Store(true)
 			before := requests.Load()

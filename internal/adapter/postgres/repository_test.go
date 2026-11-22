@@ -110,7 +110,7 @@ func TestSyncAndStoredAPI(t *testing.T) {
 	fail.Store(true)
 	before := requests.Load()
 	service := usecase.NewStored(isolated)
-	handler := httpapi.New(service)
+	handler := httpapi.New(service, nil)
 	for _, path := range []string{"/load-movies?from=1&to=5", "/last-movie"} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))

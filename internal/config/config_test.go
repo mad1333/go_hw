@@ -6,9 +6,10 @@ func TestConfig(t *testing.T) {
 	t.Setenv("MOVIE_BASE_URL", "http://localhost:1234/prefix/")
 	t.Setenv("HTTP_ADDR", ":1235")
 	t.Setenv("GRPC_ADDR", ":1236")
+	t.Setenv("REDIS_ADDR", "127.0.0.1:16379")
 	t.Setenv("DATABASE_URL", "postgres://localhost/movies")
 	c, err := Load()
-	if err != nil || c.BaseURL != "http://localhost:1234/prefix" || c.HTTPAddr != ":1235" || c.GRPCAddr != ":1236" || c.DatabaseURL != "postgres://localhost/movies" {
+	if err != nil || c.BaseURL != "http://localhost:1234/prefix" || c.HTTPAddr != ":1235" || c.GRPCAddr != ":1236" || c.DatabaseURL != "postgres://localhost/movies" || c.RedisAddr != "127.0.0.1:16379" {
 		t.Fatalf("%+v %v", c, err)
 	}
 	for _, v := range []string{"", ":bad", "file:///tmp/movies", "https://example.org?x=y"} {

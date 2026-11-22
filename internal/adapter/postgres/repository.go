@@ -108,3 +108,37 @@ func (r *Repository) GetMovies(ctx context.Context, from, to int) ([]domain.Movi
 	}
 	return movies, nil
 }
+
+func (r *Repository) AllMovies(ctx context.Context) ([]domain.Movie, error) {
+	rows, err := r.pool.Query(ctx, "SELECT id,title,year,director FROM movies ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	return collectMovies(rows)
+}
+func (r *Repository) MoviesByIDs(ctx context.Context, ids []int) ([]domain.Movie, error) {
+	values := make([]int64, len(ids))
+	for i, id := range ids {
+		values[i] = int64(id)
+	}
+	rows, err := r.pool.Query(ctx, "SELECT id,title,year,director FROM movies WHERE id = ANY($1::bigint[]) ORDER BY id", values)
+	if err != nil {
+		return nil, err
+	}
+	return collectMovies(rows)
+}
+func collectMovies(rows pgx.Rows) ([]domain.Movie, error) {
+	defer rows.Close()
+	movies := []domain.Movie{}
+	for rows.Next() {
+		var m domain.Movie
+		if err := rows.Scan(&m.ID, &m.Title, &m.Year, &m.Director); err != nil {
+			return nil, err
+		}
+		movies = append(movies, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return movies, nil
+}
