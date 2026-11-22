@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go_hw/internal/domain"
+	"time"
 )
 
 //go:embed migrations/001_movies.sql
@@ -20,7 +21,7 @@ func New(ctx context.Context, dsn string) (*Repository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("database configuration: %w", err)
 	}
-	if err = pool.Ping(ctx); err != nil {
+	if err = waitForDatabase(ctx, pool.Ping); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("database connection: %w", err)
 	}
@@ -141,4 +142,21 @@ func collectMovies(rows pgx.Rows) ([]domain.Movie, error) {
 		return nil, err
 	}
 	return movies, nil
+}
+
+func waitForDatabase(ctx context.Context, ping func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if err := ping(ctx); err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
